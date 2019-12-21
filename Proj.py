@@ -8,6 +8,7 @@ import joblib
 
 
 def matrx2list(matrx):
+    # sparse matrix to list with non-zero entries
     matrx_shape = matrx.shape
     nonzero_idx = np.argwhere(matrx>0)
     nonzero_list = []
@@ -18,6 +19,7 @@ def matrx2list(matrx):
 
 
 def gen_rn_idx(num_nodes,max_day,model):
+    # random indexes for separating training and test set
     if 'static' in model:
         rn_idx = np.arange(0,num_nodes)
         np.random.seed(42)
@@ -196,6 +198,7 @@ def log_joint(hyper_params,params,model):
         
 
 def calc_gd(hyper_params,params,model):
+    # calculate gradient
     eps = hyper_params['eps']
     theta_s = params['theta_s']
     theta_r = params['theta_r']
@@ -269,6 +272,7 @@ def calc_gd(hyper_params,params,model):
 
 
 def score(params,model):
+    # test score
     res = 0
     theta_s = params['theta_s']
     theta_r = params['theta_r']
@@ -559,30 +563,31 @@ elif 1:
             fig.colorbar(img,ax=axes[3])
     
     
-    def cmp_model(num_comm_cmp=[4,25]):
+    def cmp_model(num_comm_cmp=[25,4]):
         model = 'static'
         rearr_s_idx = [rearr(num_comm,model,'s',num_nodes+1) for num_comm in num_comm_cmp]
         data_static_ = np.load('email_data/data_static_.npy')
         fig,axes = plt.subplots(2,3,figsize=(3*4,2*4))
         file_names = ['result_files/result_{}_ncomm={}.dict'.format(model,num_comm) for num_comm in num_comm_cmp]
         for ir, rearr_idx in enumerate(rearr_s_idx):
+            cur_data = data_static_[rearr_idx][:,rearr_idx]
+            img = axes[ir,0].imshow(np.log(cur_data+1),cmap='Reds')
+            fig.colorbar(img,ax=axes[ir,0])
+            if ir==0:
+                axes[ir,0].set_title('actual data')
+            axes[ir,0].set_ylabel('arrangement {}'.format(ir+1))
             for im, num_comm in enumerate(num_comm_cmp):
                 result = joblib.load(file_names[im])
                 params = result['best_params']
                 theta_s = params['theta_s']
                 theta_r = params['theta_r']
                 matrx = np.dot(theta_s[rearr_idx],theta_r[rearr_idx].T)
-                img = axes[ir,im].imshow(np.log(matrx+1),cmap='Reds')
-                fig.colorbar(img,ax=axes[ir,im])
-                if im==0:
-                    axes[ir,im].set_ylabel('arrangement {}'.format(ir+1))
+                img = axes[ir,im+1].imshow(np.log(matrx+1),cmap='Reds')
+                fig.colorbar(img,ax=axes[ir,im+1])
                 if ir==0:
-                    axes[ir,im].set_title('model ({} communities)'.format(num_comm))
-            cur_data = data_static_[rearr_idx][:,rearr_idx]
-            img = axes[ir,im+1].imshow(np.log(cur_data+1),cmap='Reds')
-            fig.colorbar(img,ax=axes[ir,im+1])
-            if ir==0:
-                axes[ir,im+1].set_title('actual data')
+                    axes[ir,im+1].set_title('model ({} communities)'.format(num_comm))
+
+
     
     
     def plot_time():
@@ -702,7 +707,7 @@ elif 1:
                 ax.set_title('actual data')
             
             model='static'
-            num_comm = 4
+            num_comm = 25
             file_name = 'result_files/result_{}_ncomm={}.dict'.format(model,num_comm)
             result = joblib.load(file_name)
             params = result['best_params']
@@ -713,10 +718,10 @@ elif 1:
             if idx_s==1:
                 ax.set_xlabel('log(activity+1)')
             if idx_s==0:
-                ax.set_title('model (4 communities)')
+                ax.set_title('model ({} communities)'.format(num_comm))
             
             model='static'
-            num_comm = 25
+            num_comm = 4
             file_name = 'result_files/result_{}_ncomm={}.dict'.format(model,num_comm)
             result = joblib.load(file_name)
             params = result['best_params']
@@ -727,63 +732,63 @@ elif 1:
             if idx_s==1:
                 ax.set_xlabel('log(activity+1)')
             if idx_s==0:
-                ax.set_title('model (25 communities)')
+                ax.set_title('model ({} communities)'.format(num_comm))
     
     
-    #def plot_sender_day():
-    model = 'temporal'
-    num_comm = 15
-    color_bar = 0
-    plot_t = 500
-    
-    file_name = 'result_files/result_{}_ncomm={}.dict'.format(model,num_comm)
-    result = joblib.load(file_name)
-    params = result['best_params']
-    
-    theta_s = params['theta_s']
-    theta_r = params['theta_r']
-    psi = params['psi']
-    
-    act_idx = np.argsort(-data_day_.sum((1,2)))[:50]
-    act_theta_s = theta_s[act_idx]
-    
-    rearr_idx = []
-    for i_comm in range(num_comm):
-        cur_idx = np.argwhere((np.argmax(act_theta_s,1)==i_comm))[:,0]
-        rearr_idx.append(cur_idx)
-    rearr_idx = np.concatenate(rearr_idx,0)
-    
-    matrx1 = act_theta_s[rearr_idx]
-    fig = plt.figure(figsize=(2,6))
-    ax = fig.add_axes((0.35,0.3,0.6,0.55))
-    img = ax.imshow(matrx1,aspect='auto',cmap='Blues')
-    pos_arr = np.array([0,num_comm-1])
-    label_arr = pos_arr+1
-    ax.set_xticks(pos_arr)
-    ax.set_xticklabels(label_arr)
-    if color_bar:
-        fig.colorbar(img,ax=ax)
-    
-    matrx = np.dot(matrx1,np.diag(theta_r.sum(0)))
-    matrx = np.dot(matrx,psi[:plot_t].T)
-    data_mtrx = data_day_.sum(1)
-    data_mtrx = data_mtrx[act_idx][rearr_idx][:,:plot_t]
-    
-    fig,axes = plt.subplots(1,2,figsize=(9,4.5))
-    img = axes[0].imshow(np.log(matrx+1),aspect='auto',cmap='Reds')
-    fig.colorbar(img,ax=axes[0])
-    axes[1].imshow(np.log(data_mtrx+1),aspect='auto',cmap='Reds')
-    axes[1].set_xlabel('day')
-    fig.colorbar(img,ax=axes[1])
-    
-    
-    mx = np.dot(matrx1,theta_r[act_idx][rearr_idx].T)
-    data_mx = data_static_[act_idx][rearr_idx][:,act_idx][:,rearr_idx]
-    fig,axes = plt.subplots(1,2,figsize=(9,4))
-    img = axes[0].imshow(np.log(mx+1),aspect='auto',cmap='Reds')
-    fig.colorbar(img,ax=axes[0])
-    axes[1].imshow(np.log(data_mx+1),aspect='auto',cmap='Reds')
-    fig.colorbar(img,ax=axes[1])
+    def plot_sender_day():
+        model = 'temporal'
+        num_comm = 15
+        color_bar = 0
+        plot_t = 500
+        
+        file_name = 'result_files/result_{}_ncomm={}.dict'.format(model,num_comm)
+        result = joblib.load(file_name)
+        params = result['best_params']
+        
+        theta_s = params['theta_s']
+        theta_r = params['theta_r']
+        psi = params['psi']
+        
+        act_idx = np.argsort(-data_day_.sum((1,2)))[:50]
+        act_theta_s = theta_s[act_idx]
+        
+        rearr_idx = []
+        for i_comm in range(num_comm):
+            cur_idx = np.argwhere((np.argmax(act_theta_s,1)==i_comm))[:,0]
+            rearr_idx.append(cur_idx)
+        rearr_idx = np.concatenate(rearr_idx,0)
+        
+        matrx1 = act_theta_s[rearr_idx]
+        fig = plt.figure(figsize=(2,6))
+        ax = fig.add_axes((0.35,0.3,0.6,0.55))
+        img = ax.imshow(matrx1,aspect='auto',cmap='Blues')
+        pos_arr = np.array([0,num_comm-1])
+        label_arr = pos_arr+1
+        ax.set_xticks(pos_arr)
+        ax.set_xticklabels(label_arr)
+        if color_bar:
+            fig.colorbar(img,ax=ax)
+        
+        matrx = np.dot(matrx1,np.diag(theta_r.sum(0)))
+        matrx = np.dot(matrx,psi[:plot_t].T)
+        data_mtrx = data_day_.sum(1)
+        data_mtrx = data_mtrx[act_idx][rearr_idx][:,:plot_t]
+        
+        fig,axes = plt.subplots(1,2,figsize=(9,4.5))
+        img = axes[0].imshow(np.log(matrx+1),aspect='auto',cmap='Reds')
+        fig.colorbar(img,ax=axes[0])
+        axes[1].imshow(np.log(data_mtrx+1),aspect='auto',cmap='Reds')
+        axes[1].set_xlabel('day')
+        fig.colorbar(img,ax=axes[1])
+        
+        
+        mx = np.dot(matrx1,theta_r[act_idx][rearr_idx].T)
+        data_mx = data_static_[act_idx][rearr_idx][:,act_idx][:,rearr_idx]
+        fig,axes = plt.subplots(1,2,figsize=(9,4))
+        img = axes[0].imshow(np.log(mx+1),aspect='auto',cmap='Reds')
+        fig.colorbar(img,ax=axes[0])
+        axes[1].imshow(np.log(data_mx+1),aspect='auto',cmap='Reds')
+        fig.colorbar(img,ax=axes[1])
         #np.dot(matrx1,np.diag(theta_r.sum(0)))
 
 #    model='temporal'
